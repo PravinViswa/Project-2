@@ -1,19 +1,22 @@
 <html>
-<head>
-    <title>Exact Age Calculator</title>
-	<link rel='stylesheet' href='style.css'/>
-	<script src="https://code.jquery.com/jquery-latest.min.js"></script>
-	<script src='script.js'></script>
-</head>
+    <head>
+    <title> The Age Calculator</title>
+    </head>
 <body>
-    <div id="main_container">
-        <div id="birth_date_input">Birth Date*: <input type="date" id="birth_date"></div>
-        <br/>
-        <div id="calculate">Calculate your age**</div>
-        
-        <div id="age_container"><span id="exact_age">Age</span></div>
-        <p><em>* The year here is 365 days and the month here is 30 days, that means your birthday may not mean you will be 0 days old.</br>  
-        **Don't worry I will not share your input.</em></p>
-        </p>
-    </div>
+    <script language="JavaScript">
+function CalculateAge()
+{
+var birthyear = document.form1.txt.value;
+var currentyear  = new Date();
+var age   = currentyear.getFullYear();
+document.write('Your Age is ' + (age-birthyear);
+ }
+    </script>
+        <form name=form1>
+            Enter the Birth Year
+           <input type="text" name="txt" size=10>
+           <br>
+           <input type="button" value="Calculate" onClick='CalculateAge();'>  
+        </form> 
 </body>
+</html>
