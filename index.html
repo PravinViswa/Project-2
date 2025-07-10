@@ -1,51 +1,91 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Price Tracker</title>
-  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-</head>
-<body class="bg-gradient-to-br from-yellow-50 to-white min-h-screen flex flex-col items-center justify-center p-6 font-sans">
+// 📦 Full backend code for your Price Tracker project
 
-  <div class="bg-white shadow-2xl rounded-xl p-8 w-full max-w-2xl text-center">
-    <h1 class="text-4xl font-extrabold text-orange-500 mb-4">💰 Price Tracker</h1>
-    <p class="text-lg text-gray-700 mb-6">Track real product trends — or laugh at fake petrol prices 😅</p>
+const express = require("express");
+const axios = require("axios");
+const cheerio = require("cheerio");
+const mongoose = require("mongoose");
+const cors = require("cors");
 
-    <!-- Product Link Box -->
-    <input type="text" placeholder="Paste your product link here..."
-           class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400 mb-4" />
+const app = express();
+app.use(cors());
+app.use(express.json());
 
-    <button onclick="showFakeMessage()" 
-            class="bg-orange-500 hover:bg-orange-600 text-white font-semibold px-6 py-3 rounded-lg shadow-md transition">
-      🔍 Track Price
-    </button>
+// ⚙️ Connect to MongoDB Atlas
+mongoose.connect("mongodb+srv://<username>:<password>@cluster.mongodb.net/price-tracker", {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+});
 
-    <!-- Output Area -->
-    <div id="output" class="mt-6 text-gray-600 text-md hidden">
-      <p>😴 API is still sleeping... Try again when it's less lazy.</p>
-    </div>
+// 🧠 Mongoose Schemas
+const Product = mongoose.model("Product", new mongoose.Schema({
+  url: String,
+  title: String,
+  site: String,
+  createdAt: { type: Date, default: Date.now }
+}));
 
-    <!-- Divider -->
-    <div class="my-8 border-t border-gray-300"></div>
+const Price = mongoose.model("Price", new mongoose.Schema({
+  productId: mongoose.Schema.Types.ObjectId,
+  price: Number,
+  date: { type: Date, default: Date.now }
+}));
 
-    <!-- Constant Trackers -->
-    <h2 class="text-xl font-bold text-gray-800 mb-4">Quick Access Trackers</h2>
-    <div class="flex flex-wrap gap-4 justify-center">
-      <button class="bg-yellow-500 hover:bg-yellow-600 text-white px-5 py-3 rounded-lg font-medium shadow-md">🥇 Gold</button>
-      <button class="bg-gray-500 hover:bg-gray-600 text-white px-5 py-3 rounded-lg font-medium shadow-md">⛽ Petrol (fake af)</button>
-      <button class="bg-gray-500 hover:bg-gray-600 text-white px-5 py-3 rounded-lg font-medium shadow-md">🚗 Diesel (still fake)</button>
-    </div>
+// 🔍 Amazon Scraper Function
+async function scrapeAmazon(url) {
+  const { data } = await axios.get(url, {
+    headers: { "User-Agent": "Mozilla/5.0" }
+  });
+  const $ = cheerio.load(data);
+  const title = $("#productTitle").text().trim();
+  const priceStr = $("#priceblock_ourprice").text() || $("#priceblock_dealprice").text();
+  const price = parseFloat(priceStr.replace(/[₹,]/g, ""));
+  return { title, price, site: "Amazon" };
+}
 
-    <p class="text-xs text-gray-400 mt-10">Built with 💻 by Pravin Viswa | Real trends coming soon ⚙️</p>
-  </div>
+// 🛒 Track Product Route
+app.post("/track-product", async (req, res) => {
+  const { url } = req.body;
+  if (!url) return res.json({ success: false, message: "No URL provided" });
 
-  <!-- JS for dummy response -->
-  <script>
-    function showFakeMessage() {
-      document.getElementById("output").classList.remove("hidden");
+  try {
+    const { title, price, site } = await scrapeAmazon(url);
+
+    if (!price || !title) {
+      return res.json({ success: false, message: "Failed to fetch price/title" });
     }
-  </script>
 
-</body>
-</html>
+    let product = await Product.findOne({ url });
+    if (!product) {
+      product = await Product.create({ url, title, site });
+    }
+
+    await Price.create({ productId: product._id, price });
+
+    res.json({
+      success: true,
+      title,
+      price,
+      site,
+      productId: product._id
+    });
+  } catch (err) {
+    console.error("Scraping error:", err.message);
+    res.json({ success: false, message: "Error during scraping" });
+  }
+});
+
+// 🪙 Gold Price Route (Optional Static Demo)
+app.get("/gold-price", async (req, res) => {
+  try {
+    // You can replace this with a real API like Metals-API
+    const fakePrice = 5995; // INR per gram (example)
+    res.json({ success: true, price: fakePrice, source: "Static Demo" });
+  } catch (err) {
+    res.json({ success: false, message: "Failed to fetch gold price" });
+  }
+});
+
+// 🚀 Start Server
+app.listen(3000, () => {
+  console.log("Server running on http://localhost:3000");
+});
